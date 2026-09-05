@@ -30,9 +30,9 @@ no tokens. Drop the option (or set `false`) to restore the native bar.
 ### OpenRouter balance (pilot)
 
 - Reads the OpenRouter key from `<state>/auth.json` (field `openrouter.key`) and calls
-  `GET https://openrouter.ai/api/v1/auth/key` on load, +2s, and every ~60s.
+  `GET https://openrouter.ai/api/v1/credits` on load, +2s, and every ~60s.
 - On the **home** screen (`home_bottom`) and on the session bar (`app_bottom`), shows the
-  remaining credits in BRL (`limit_remaining` × 5) — or `sem limite` when no limit is set on the key.
+  remaining credits in BRL (`total_credits - total_usage`, × 5).
 - No OpenRouter key found → nothing extra is rendered, plugin behaves as before.
 
 ## Install

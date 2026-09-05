@@ -6,11 +6,10 @@ import type { TuiPlugin, TuiPluginModule, TuiThemeCurrent } from "@opencode-ai/p
 
 const BRL_PER_USD = 5
 
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1/auth/key"
+const OPENROUTER_CREDITS = "https://openrouter.ai/api/v1/credits"
 
 type SaldoState =
   | { kind: "credits"; value: number }
-  | { kind: "no-limit" }
   | { kind: "unavailable" }
 
 const readOpenRouterKey = (stateDir: string): string | undefined => {
@@ -36,20 +35,17 @@ const fetchSaldo = async (key: string): Promise<SaldoState | undefined> => {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 15_000)
   try {
-    const res = await fetch(OPENROUTER_BASE, {
+    const res = await fetch(OPENROUTER_CREDITS, {
       headers: { Authorization: `Bearer ${key}` },
       signal: controller.signal,
     })
     if (!res.ok) return { kind: "unavailable" }
     const body = (await res.json()) as {
-      data?: { limit?: number | null; limit_remaining?: number | null }
+      data?: { total_credits?: number; total_usage?: number }
     }
     const data = body?.data
-    if (typeof data?.limit_remaining === "number") {
-      return { kind: "credits", value: data.limit_remaining }
-    }
-    if (data?.limit === null || data?.limit === undefined) {
-      return { kind: "no-limit" }
+    if (typeof data?.total_credits === "number" && typeof data?.total_usage === "number") {
+      return { kind: "credits", value: Math.max(0, data.total_credits - data.total_usage) }
     }
     return { kind: "unavailable" }
   } catch {
@@ -161,11 +157,7 @@ const tui: TuiPlugin = async (api, options) => {
     return (
       <>
         <text fg={theme.accent}>  |  ◆ openrouter: </text>
-        {current.kind === "credits" ? (
-          <text fg={theme.success}>{formatBRL(current.value)}</text>
-        ) : (
-          <text fg={theme.info}>sem limite</text>
-        )}
+        <text fg={theme.success}>{formatBRL(current.value)}</text>
       </>
     )
   }
@@ -263,11 +255,7 @@ const tui: TuiPlugin = async (api, options) => {
           >
             <box flexDirection="row">
               <text fg={theme.accent}>◆ openrouter: </text>
-              {current.kind === "credits" ? (
-                <text fg={theme.success}>{formatBRL(current.value)}</text>
-              ) : (
-                <text fg={theme.info}>sem limite</text>
-              )}
+              <text fg={theme.success}>{formatBRL(current.value)}</text>
             </box>
           </box>
         )
