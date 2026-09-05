@@ -308,39 +308,7 @@ const tui: TuiPlugin = async (api, options) => {
 
   api.slots.register({
     slots: {
-      ...(hideNativeCost
-        ? {
-            session_prompt(ctx, props) {
-              const theme = ctx.theme.current
-              const session = props.session_id
-                ? api.state.session.get(props.session_id)
-                : undefined
-              const model = session?.model
-              return (
-                <box flexDirection="column" flexGrow={1} minHeight={0}>
-                  <box flexDirection="row" paddingLeft={2} gap={1}>
-                    {model ? (
-                      <text fg={theme.textMuted}>◆ {model.id}</text>
-                    ) : undefined}
-                  </box>
-                  <api.ui.Prompt
-                    sessionID={props.session_id}
-                    visible={props.visible}
-                    disabled={props.disabled}
-                    onSubmit={props.on_submit}
-                    ref={props.ref}
-                    right={
-                      <api.ui.Slot
-                        name="session_prompt_right"
-                        session_id={props.session_id}
-                      />
-                    }
-                  />
-                </box>
-              )
-            },
-          }
-        : {}),
+
       home_bottom(ctx) {
         if (!openRouterKey) return undefined
         const current = saldo()
