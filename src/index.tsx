@@ -250,7 +250,7 @@ const tui: TuiPlugin = async (api, options) => {
 
   const seed = async () => {
     try {
-      const result = await api.client.experimental.session.list({ limit: 1000 })
+      const result = await api.client.experimental.session.list({ limit: 1000, directory: "" })
       if (Array.isArray(result?.data)) result.data.forEach((s) => assess(s))
     } catch {
       try {
