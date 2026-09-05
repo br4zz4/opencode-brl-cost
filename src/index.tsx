@@ -1,12 +1,75 @@
-import { readFileSync } from "node:fs"
+import { readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { createSignal } from "solid-js"
 import type { TuiPlugin, TuiPluginModule, TuiThemeCurrent } from "@opencode-ai/plugin/tui"
 
-const BRL_PER_USD = 5
+const RATE_FALLBACK = 5.0
 
+const AWESOMEAPI_USD_BRL = "https://economia.awesomeapi.com.br/json/last/USD-BRL"
 const OPENROUTER_CREDITS = "https://openrouter.ai/api/v1/credits"
+const RATE_FILE = "brl-cost-rate.json"
+
+type RateCache = { rate: number; date: string; timestamp: string }
+type RateState = "fresh" | "stale_one_day" | "stale" | "unavailable"
+
+const toDateKey = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+
+const loadCachedRate = (stateDir: string): RateCache | null => {
+  try {
+    const raw = readFileSync(join(stateDir, RATE_FILE), "utf8")
+    const parsed = JSON.parse(raw) as Partial<RateCache>
+    if (
+      typeof parsed?.rate === "number" &&
+      typeof parsed?.date === "string" &&
+      typeof parsed?.timestamp === "string"
+    ) {
+      return { rate: parsed.rate, date: parsed.date, timestamp: parsed.timestamp }
+    }
+  } catch {
+    // sem cache ainda
+  }
+  return null
+}
+
+const saveCachedRate = (stateDir: string, rate: number): void => {
+  const cache: RateCache = {
+    rate,
+    date: toDateKey(new Date()),
+    timestamp: new Date().toISOString(),
+  }
+  try {
+    writeFileSync(join(stateDir, RATE_FILE), JSON.stringify(cache, null, 2), "utf8")
+  } catch {
+    // cache best-effort
+  }
+}
+
+const rateState = (cache: RateCache | null): RateState => {
+  if (!cache) return "unavailable"
+  const now = new Date()
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+  if (cache.date === toDateKey(now)) return "fresh"
+  if (cache.date === toDateKey(yesterday)) return "stale_one_day"
+  return "stale"
+}
+
+const fetchRate = async (): Promise<number | undefined> => {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15_000)
+  try {
+    const res = await fetch(AWESOMEAPI_USD_BRL, { signal: controller.signal })
+    if (!res.ok) return undefined
+    const body = (await res.json()) as { USDBRL?: { bid?: string } }
+    const parsed = typeof body?.USDBRL?.bid === "string" ? Number(body.USDBRL.bid) : NaN
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+  } catch {
+    return undefined
+  } finally {
+    clearTimeout(timeout)
+  }
+}
 
 type SaldoState =
   | { kind: "credits"; value: number }
@@ -55,8 +118,8 @@ const fetchSaldo = async (key: string): Promise<SaldoState | undefined> => {
   }
 }
 
-const formatBRL = (usd: number) => {
-  const rounded = Math.round(usd * BRL_PER_USD * 100) / 100
+const formatBRLValue = (brl: number) => {
+  const rounded = Math.round(brl * 100) / 100
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -82,8 +145,10 @@ const tui: TuiPlugin = async (api, options) => {
   const [monthCost, setMonthCost] = createSignal<string>("R$ 0,00")
   const [sessionCost, setSessionCost] = createSignal<string>("R$ 0,00")
   const [saldo, setSaldo] = createSignal<SaldoState | undefined>(undefined)
+  const [currentRate, setCurrentRate] = createSignal<number | null>(null)
+  const [rateStatus, setRateStatus] = createSignal<RateState>("unavailable")
 
-  const costs = new Map<string, { cost: number; created: number }>()
+  const costs = new Map<string, { cost: number; created: number; rate: number }>()
 
   const assess = (
     info:
@@ -96,7 +161,12 @@ const tui: TuiPlugin = async (api, options) => {
       | undefined,
   ) => {
     if (!info || typeof info.cost !== "number" || typeof info.time?.created !== "number") return
-    costs.set(info.id, { cost: info.cost, created: info.time.created })
+    const existing = costs.get(info.id)
+    costs.set(info.id, {
+      cost: info.cost,
+      created: info.time.created,
+      rate: existing?.rate ?? currentRate() ?? RATE_FALLBACK,
+    })
   }
 
   const openRouterKey = readOpenRouterKey(api.state.path.state)
@@ -121,7 +191,8 @@ const tui: TuiPlugin = async (api, options) => {
       const info = result.data
       if (!info) return
       assess(info)
-      setSessionCost(formatBRL(typeof info.cost === "number" ? info.cost : 0))
+      const entry = costs.get(sessionID)
+      setSessionCost(formatBRLValue(entry ? entry.cost * entry.rate : 0))
     } catch {
       // ignore
     }
@@ -137,27 +208,42 @@ const tui: TuiPlugin = async (api, options) => {
     let month = 0
 
     for (const entry of costs.values()) {
-      if (entry.created >= dayStart) day += entry.cost
-      if (entry.created >= weekStart) week += entry.cost
-      if (entry.created >= monthStart) month += entry.cost
+      const brl = entry.cost * entry.rate
+      if (entry.created >= dayStart) day += brl
+      if (entry.created >= weekStart) week += brl
+      if (entry.created >= monthStart) month += brl
     }
-    setDayCost(formatBRL(day))
-    setWeekCost(formatBRL(week))
-    setMonthCost(formatBRL(month))
+    setDayCost(formatBRLValue(day))
+    setWeekCost(formatBRLValue(week))
+    setMonthCost(formatBRLValue(month))
 
     const sessionID = currentSessionID()
-    const sessionCost = sessionID ? costs.get(sessionID)?.cost : undefined
-    setSessionCost(formatBRL(typeof sessionCost === "number" ? sessionCost : 0))
+    const entry = sessionID ? costs.get(sessionID) : undefined
+    setSessionCost(formatBRLValue(entry ? entry.cost * entry.rate : 0))
     if (sessionID) void fetchSessionCost(sessionID)
   }
 
   const openRouterSaldo = (theme: TuiThemeCurrent) => {
     const current = saldo()
     if (!current || current.kind === "unavailable") return undefined
+    const rate = currentRate() ?? RATE_FALLBACK
     return (
       <>
         <text fg={theme.accent}>  |  ◆ openrouter: </text>
-        <text fg={theme.success}>{formatBRL(current.value)}</text>
+        <text fg={theme.success}>{formatBRLValue(current.value * rate)}</text>
+      </>
+    )
+  }
+
+  const rateSegment = (theme: TuiThemeCurrent) => {
+    const status = rateStatus()
+    const rate = currentRate()
+    const fg = status === "fresh" ? theme.textMuted : theme.warning
+    const value = rate !== null ? formatBRLValue(rate) : "--"
+    return (
+      <>
+        <text fg={fg}>◆ USD: </text>
+        <text fg={fg}>{value}</text>
       </>
     )
   }
@@ -177,8 +263,25 @@ const tui: TuiPlugin = async (api, options) => {
     refresh()
   }
 
+  const stateDir = api.state.path.state
+  const cachedRate = loadCachedRate(stateDir)
+  if (cachedRate) {
+    const state = rateState(cachedRate)
+    setRateStatus(state)
+    if (state === "fresh" || state === "stale_one_day") setCurrentRate(cachedRate.rate)
+  }
+
   refresh()
   void seed()
+  void (async () => {
+    const rate = await fetchRate()
+    if (typeof rate === "number") {
+      saveCachedRate(stateDir, rate)
+      setCurrentRate(rate)
+      setRateStatus("fresh")
+      refresh()
+    }
+  })()
   void loadOpenRouterSaldo()
   setTimeout(() => void loadOpenRouterSaldo(), 2_000)
   const saldoInterval = setInterval(() => void loadOpenRouterSaldo(), 60_000)
@@ -255,7 +358,9 @@ const tui: TuiPlugin = async (api, options) => {
           >
             <box flexDirection="row">
               <text fg={theme.accent}>◆ openrouter: </text>
-              <text fg={theme.success}>{formatBRL(current.value)}</text>
+              <text fg={theme.success}>
+                {formatBRLValue(current.value * (currentRate() ?? RATE_FALLBACK))}
+              </text>
             </box>
           </box>
         )
@@ -283,7 +388,8 @@ const tui: TuiPlugin = async (api, options) => {
               <text fg={theme.warning}>{monthCost()}</text>
             </box>
             <box flexDirection="row">
-              <text fg={theme.textMuted}>◆ session: </text>
+              {rateSegment(theme)}
+              <text fg={theme.textMuted}>  |  ◆ session: </text>
               <text fg={theme.text}>{sessionCost()}</text>
               {openRouterSaldo(theme)}
             </box>
