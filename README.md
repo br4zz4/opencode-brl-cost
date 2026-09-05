@@ -7,10 +7,17 @@ OpenCode **TUI plugin** that pins cost tracking to the bottom bar, in Brazilian 
 - Renders a fixed status bar via the `app_bottom` TUI slot.
 - Bottom-left shows **aggregated spend across ALL opencode sessions** (every project, not just the current one) since the start of today, this week (Monday), and this month.
 - Bottom-right shows **the active session's total cost** (`session.cost`, USD).
-- Costs come from each session's cumulative cost (`session.cost`, USD), attributed to the day it was **created**, converted with a **hardcoded rate of R$ 5,00 / US$ 1,00**.
+- Costs come from each session's cumulative cost (`session.cost`, USD), attributed to the day it was **created**, converted with the **USD→BRL quote of that day** (see below).
 - Sessions are enumerated via the SDK's global endpoint (`experimental.session.list`, with fallback to `session.list`) on load, and kept fresh through `session.*` events.
 - Falls back to `R$ 0,00` when there's no data.
 - Currency formatting uses `Intl.NumberFormat` with `pt-BR` (e.g. `R$ 1,23`).
+
+### Daily USD→BRL quote
+
+- Fetched once per day from **AwesomeAPI** (`GET https://economia.awesomeapi.com.br/json/last/USD-BRL`, field `bid`) — no auth, on plugin load, non-blocking.
+- Cached in `<state>/brl-cost-rate.json` (`{ rate, date, timestamp }`). A cached quote from today (or yesterday) is reused instead of calling the API again.
+- Each session is **stamped with the quote of the day it was created**, so day/week/month totals are computed with each session's own rate — not a single global rate.
+- Shown bottom-right as `◆ USD: R$ 5,12` (muted when fresh, yellow/warning when the cache is from yesterday, `--` when 2+ days stale or never fetched — costs then fall back to R$ 5.00).
 
 Your session's cost is shown bottom-right (`◆ session`), the OpenRouter balance is
 shown on the right of the bar, and the **native bar below the prompt** still shows the
@@ -32,7 +39,7 @@ no tokens. Drop the option (or set `false`) to restore the native bar.
 - Reads the OpenRouter key from `<state>/auth.json` (field `openrouter.key`) and calls
   `GET https://openrouter.ai/api/v1/credits` on load, +2s, and every ~60s.
 - On the **home** screen (`home_bottom`) and on the session bar (`app_bottom`), shows the
-  remaining credits in BRL (`total_credits - total_usage`, × 5).
+  remaining credits in BRL (`total_credits - total_usage`, × the daily quote).
 - No OpenRouter key found → nothing extra is rendered, plugin behaves as before.
 
 ## Install
@@ -80,7 +87,7 @@ npm publish
 
 ## Roadmap
 
-- Configurable USD→BRL rate (instead of the hardcoded 5)
+- Per-day rate tracking inside a single long session (sessions use the quote of their creation day)
 - Session cost delta per last response
 - Token counters (input/output)
 - Balance for providers other than OpenRouter (pilot only)
