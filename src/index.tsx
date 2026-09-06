@@ -138,11 +138,27 @@ const startOfWeek = (date: Date): number => {
 const startOfMonth = (date: Date): number =>
   new Date(date.getFullYear(), date.getMonth(), 1).getTime()
 
+const computeProjection = (monthBrl: number): string => {
+  const now = new Date()
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const completedDays = now.getDate() - 1
+  const remaining = daysInMonth - now.getDate()
+
+  if (completedDays <= 0) return ""
+  if (monthBrl <= 0) return ""
+  if (remaining <= 0) return ""
+
+  const average = monthBrl / completedDays
+  const prediction = monthBrl + average * remaining
+  return formatBRLValue(prediction)
+}
+
 const tui: TuiPlugin = async (api, options) => {
   const hideNativeCost = options?.hideNativeCost === true
   const [dayCost, setDayCost] = createSignal<string>("R$ 0,00")
   const [weekCost, setWeekCost] = createSignal<string>("R$ 0,00")
   const [monthCost, setMonthCost] = createSignal<string>("R$ 0,00")
+  const [monthProjection, setMonthProjection] = createSignal<string>("")
   const [sessionCost, setSessionCost] = createSignal<string>("R$ 0,00")
   const [saldo, setSaldo] = createSignal<SaldoState | undefined>(undefined)
   const [currentRate, setCurrentRate] = createSignal<number | null>(null)
@@ -216,6 +232,7 @@ const tui: TuiPlugin = async (api, options) => {
     setDayCost(formatBRLValue(day))
     setWeekCost(formatBRLValue(week))
     setMonthCost(formatBRLValue(month))
+    setMonthProjection(computeProjection(month))
 
     const sessionID = currentSessionID()
     const entry = sessionID ? costs.get(sessionID) : undefined
@@ -354,6 +371,12 @@ const tui: TuiPlugin = async (api, options) => {
               <text fg={theme.success}>{weekCost()}</text>
               <text fg={theme.textMuted}>{separator}mês: </text>
               <text fg={theme.warning}>{monthCost()}</text>
+              {monthProjection() && (
+                <>
+                  <text fg={theme.accent}> → </text>
+                  <text fg={theme.accent}>{monthProjection()}</text>
+                </>
+              )}
             </box>
             <box flexDirection="row">
               {rateSegment(theme)}

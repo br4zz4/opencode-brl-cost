@@ -6,6 +6,7 @@ OpenCode **TUI plugin** that pins cost tracking to the bottom bar, in Brazilian 
 
 - Renders a fixed status bar via the `app_bottom` TUI slot.
 - Bottom-left shows **aggregated spend across ALL opencode sessions** (every project, not just the current one) since the start of today, this week (Monday), and this month.
+- The month figure is followed by a **month-end projection** (`mês: R$ 45,67 → R$ 52,30`): it averages the spend of the completed days so far (up to yesterday) and extrapolates to the rest of the month. Hidden on the 1st, on the last day, and when the month cost is zero.
 - Bottom-right shows **the active session's total cost** (`session.cost`, USD).
 - Costs come from each session's cumulative cost (`session.cost`, USD), attributed to the day it was **created**, converted with the **USD→BRL quote of that day** (see below).
 - Sessions are enumerated via the SDK's global endpoint (`experimental.session.list`, with fallback to `session.list`) on load, and kept fresh through `session.*` events.
