@@ -2,6 +2,9 @@
 
 OpenCode **TUI plugin** that pins cost tracking to the bottom bar, in Brazilian Reais (R$).
 
+> **Note**: currently integrates only with **OpenRouter** for balance display. Other
+> providers are tracked for cost (day/week/month) but the balance feature is OpenRouter-only.
+
 ## How it works
 
 - Renders a fixed status bar via the `app_bottom` TUI slot.
