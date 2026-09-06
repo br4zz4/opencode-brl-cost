@@ -371,12 +371,12 @@ const tui: TuiPlugin = async (api, options) => {
               <text fg={theme.success}>{weekCost()}</text>
               <text fg={theme.textMuted}>{separator}mês: </text>
               <text fg={theme.warning}>{monthCost()}</text>
-              {monthProjection() && (
+              {monthProjection() ? (
                 <>
                   <text fg={theme.accent}> → </text>
                   <text fg={theme.accent}>{monthProjection()}</text>
                 </>
-              )}
+              ) : null}
             </box>
             <box flexDirection="row">
               {rateSegment(theme)}
