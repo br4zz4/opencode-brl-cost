@@ -5,6 +5,17 @@ OpenCode **TUI plugin** that pins cost tracking to the bottom bar, in Brazilian 
 > **Note**: currently integrates only with **OpenRouter** for balance display. Other
 > providers are tracked for cost (day/week/month) but the balance feature is OpenRouter-only.
 
+### Provider balance integration
+
+| Provider    | Balance display |
+| ----------- | --------------- |
+| OpenRouter  | ✅ Available    |
+| OpenAI      | ⏳ Pending      |
+| Anthropic   | ⏳ Pending      |
+| Google      | ⏳ Pending      |
+| Mistral     | ⏳ Pending      |
+| xAI (Grok)  | ⏳ Pending      |
+
 ## How it works
 
 - Renders a fixed status bar via the `app_bottom` TUI slot.
