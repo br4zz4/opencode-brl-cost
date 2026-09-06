@@ -77,9 +77,9 @@ Then **restart OpenCode**. The bottom bar appears at the bottom.
 
 ## Why this shape
 
-Per the `qwert:opencode-plugin` skill, OpenCode plugins must ship a **built `.js`** via npm with an
-`exports["./tui"]` entrypoint. The runtime does **not** transpile `.tsx`/`.ts` from `node_modules` — it
-fails silently. So this package publishes `dist/index.js` (esbuild output), never raw `.tsx`.
+OpenCode loads TUI plugins from npm as **pre-built JavaScript** — the runtime does not
+transpile `.tsx`/`.ts` from `node_modules`. So this package ships `dist/index.js`
+(esbuild output) via the `exports["./tui"]` entrypoint, never raw `.tsx`.
 
 ## Local development
 
