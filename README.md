@@ -96,3 +96,5 @@ npm publish
 ## License
 
 AGPL-3.0 · Copyright (C) 2025 oporpino <dev@porpi.no>
+
+![OpenCode Plugin](https://img.shields.io/badge/OpenCode-Plugin-blue)
