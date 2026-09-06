@@ -93,6 +93,11 @@ npm publish
 - Token counters (input/output)
 - Balance for providers other than OpenRouter (pilot only)
 
+## Contributing
+
+Contributions are welcome! Feel free to open issues, suggest features, or submit
+pull requests. Keep commits atomic and follow the existing code style.
+
 ## License
 
 AGPL-3.0 · Copyright (C) 2025 oporpino <dev@porpi.no>
