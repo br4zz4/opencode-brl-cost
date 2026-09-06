@@ -16,6 +16,10 @@ OpenCode **TUI plugin** that pins cost tracking to the bottom bar, in Brazilian 
 | Mistral     | ⏳ Pending      |
 | xAI (Grok)  | ⏳ Pending      |
 
+## Screenshot
+
+![opencode-brl-cost example](docs/example.png)
+
 ## How it works
 
 - Renders a fixed status bar via the `app_bottom` TUI slot.
