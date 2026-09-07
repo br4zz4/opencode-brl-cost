@@ -1,0 +1,16 @@
+# ward configuration — https://github.com/br4zz4/ward/blob/main/docs/configuration.md
+
+# encryption:
+#   key_file: .ward/opencode-brl-cost.key   # path to encryption key — add to .gitignore
+#   key_env: WARD_KEY        # or: env var holding the key (takes precedence)
+
+
+# vaults:
+#   default_dir: .ward/vaults/opencode-brl-cost   # where 'ward new <name>' creates files
+#   sources:
+#     - name: opencode-brl-cost                   # add more vaults here
+#       path: .ward/vaults/opencode-brl-cost
+
+vaults:
+  - name: opencode-brl-cost
+    path: .ward/vaults/opencode-brl-cost
