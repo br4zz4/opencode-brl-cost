@@ -164,25 +164,35 @@ const tui: TuiPlugin = async (api, options) => {
   const [currentRate, setCurrentRate] = createSignal<number | null>(null)
   const [rateStatus, setRateStatus] = createSignal<RateState>("unavailable")
 
-  const costs = new Map<string, { cost: number; created: number; rate: number }>()
+  const costs = new Map<string, { cost: number; created: number; updated: number; rate: number }>()
+  const contributions = new Map<string, { brl: number; ts: number }[]>()
 
   const assess = (
     info:
       | {
           id: string
           cost?: number
-          time?: { created?: number }
+          time?: { created?: number; updated?: number }
           model?: { providerID?: string }
         }
       | undefined,
   ) => {
     if (!info || typeof info.cost !== "number" || typeof info.time?.created !== "number") return
     const existing = costs.get(info.id)
+    const prevCost = existing?.cost ?? 0
+    const delta = info.cost - prevCost
+    const rate = existing?.rate ?? currentRate() ?? RATE_FALLBACK
+    const updated = typeof info.time?.updated === "number" ? info.time.updated : info.time.created
     costs.set(info.id, {
       cost: info.cost,
       created: info.time.created,
-      rate: existing?.rate ?? currentRate() ?? RATE_FALLBACK,
+      updated,
+      rate,
     })
+    if (delta <= 0) return
+    const list = contributions.get(info.id) ?? []
+    list.push({ brl: delta * rate, ts: updated })
+    contributions.set(info.id, list)
   }
 
   const openRouterKey = readOpenRouterKey(api.state.path.state)
@@ -223,11 +233,12 @@ const tui: TuiPlugin = async (api, options) => {
     let week = 0
     let month = 0
 
-    for (const entry of costs.values()) {
-      const brl = entry.cost * entry.rate
-      if (entry.created >= dayStart) day += brl
-      if (entry.created >= weekStart) week += brl
-      if (entry.created >= monthStart) month += brl
+    for (const list of contributions.values()) {
+      for (const { brl, ts } of list) {
+        if (ts >= dayStart) day += brl
+        if (ts >= weekStart) week += brl
+        if (ts >= monthStart) month += brl
+      }
     }
     setDayCost(formatBRLValue(day))
     setWeekCost(formatBRLValue(week))
